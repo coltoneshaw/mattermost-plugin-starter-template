@@ -1,22 +1,51 @@
 import {Store, Action} from 'redux';
 
-import {GlobalState} from 'mattermost-redux/types/store';
+import {GlobalState} from '@mattermost/types/store';
 
-import manifest from './manifest';
+import {getConfig} from 'mattermost-redux/selectors/entities/general';
 
-// eslint-disable-next-line import/no-unresolved
+import {RHS} from './RHS';
+
+import {manifest} from './manifest';
+
 import {PluginRegistry} from './types/mattermost-webapp';
+
+const action = `${manifest.id}_received_rhs_action`;
+export function setShowRHSAction(showRHSPluginAction: () => void): unknown {
+    return {
+        type: action,
+        showRHSPluginAction,
+    };
+}
 
 export default class Plugin {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
-    public async initialize(registry: PluginRegistry, store: Store<GlobalState, Action<Record<string, unknown>>>) {
+    public async initialize(registry: PluginRegistry, store: Store<GlobalState, Action<string>>) {
         // @see https://developers.mattermost.com/extend/plugins/webapp/reference/
+
+        // RHS Registration
+        const {toggleRHSPlugin} = registry.registerRightHandSidebarComponent(RHS, 'Test');
+        const boundToggleRHSAction = () => store.dispatch(toggleRHSPlugin);
+
+        // App Bar icon
+        if (registry.registerAppBarComponent) {
+            // @ts-ignore
+            const config = getConfig(store.getState());
+            const siteUrl = (config && config.SiteURL) || '';
+            const iconURL = `${siteUrl}/plugins/${manifest.id}/public/app-bar-icon.png`;
+            registry.registerAppBarComponent({
+                iconUrl: iconURL,
+                tooltipText: 'Customers',
+                action: boundToggleRHSAction,
+                supportedProductIds: '*',
+            });
+        }
     }
 }
 
 declare global {
     interface Window {
-        registerPlugin(id: string, plugin: Plugin): void
+        registerPlugin(pluginId: string, plugin: Plugin): void
     }
 }
 
